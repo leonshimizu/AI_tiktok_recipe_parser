@@ -22,15 +22,17 @@ def download_tiktok_video(url):
     subprocess.run(command, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     return video_filename
 
-def get_tiktok_description(url):
+def get_tiktok_data(url):
+    # We'll now return both description and thumbnail from the dumped JSON
     command = ["yt-dlp", url, "--dump-json"]
     try:
         result = subprocess.run(command, capture_output=True, text=True, check=True)
         data = json.loads(result.stdout.strip())
         description = data.get("description", "")
-        return description
+        thumbnail = data.get("thumbnail", "")
+        return description, thumbnail
     except subprocess.CalledProcessError:
-        return ""
+        return "", ""
 
 def extract_audio(video_file):
     audio_filename = f"audio_{uuid.uuid4().hex}.wav"
@@ -118,7 +120,7 @@ if __name__ == "__main__":
         video_file = download_tiktok_video(url)
         audio_file = extract_audio(video_file)
         transcript = transcribe_audio(audio_file)
-        description = get_tiktok_description(url)
+        description, thumbnail_url = get_tiktok_data(url)
         combined_text = f"{transcript}\n\n{description}"
         moderate_text(combined_text)
         title, ingredients, steps, notes = parse_with_gpt(transcript, description)
@@ -129,6 +131,11 @@ if __name__ == "__main__":
             "instructions": steps,
             "notes": notes
         }
+
+        # If we got a thumbnail URL, include it in the result
+        if thumbnail_url:
+            result["image_url"] = thumbnail_url
+
         # Print only JSON
         sys.stdout.write(json.dumps(result))
         sys.stdout.flush()
