@@ -3,15 +3,23 @@ import subprocess
 import uuid
 import os
 import json
-from openai import OpenAI
 import whisper
+import warnings
+from openai import OpenAI
 
-client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+# Suppress Python warnings
+warnings.filterwarnings("ignore")
+
+# Set up the OpenAI client
+client = OpenAI(
+    api_key=os.environ.get("OPENAI_API_KEY")  # defaults to env var if omitted
+)
 
 def download_tiktok_video(url):
     video_filename = f"video_{uuid.uuid4().hex}.mp4"
     command = ["yt-dlp", url, "-o", video_filename]
-    subprocess.run(command, check=True)
+    # Capture output so it doesn't print
+    subprocess.run(command, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     return video_filename
 
 def get_tiktok_description(url):
@@ -31,7 +39,8 @@ def extract_audio(video_file):
         "-ar", "16000", "-ac", "1",
         "-vn", audio_filename, "-y"
     ]
-    subprocess.run(command, check=True)
+    # Capture output to avoid printing anything
+    subprocess.run(command, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     return audio_filename
 
 def transcribe_audio(audio_file):
@@ -77,21 +86,17 @@ Description:
 """
     response = client.chat.completions.create(
         model="gpt-3.5-turbo",
-        messages=[{"role":"user", "content": prompt}],
+        messages=[{"role": "user", "content": prompt}],
         temperature=0
     )
     content = response.choices[0].message.content.strip()
 
-    try:
-        data = json.loads(content)
-        title = data.get("title", "")
-        ingredients = data.get("ingredients", [])
-        instructions = data.get("instructions", [])
-        notes = data.get("notes", "")
-        return title, ingredients, instructions, notes
-    except json.JSONDecodeError:
-        # If GPT response is not JSON parseable, return empty and note an error
-        raise ValueError("Failed to parse GPT response as JSON.")
+    data = json.loads(content)  # If this fails, it will be handled by the caller
+    title = data.get("title", "")
+    ingredients = data.get("ingredients", [])
+    instructions = data.get("instructions", [])
+    notes = data.get("notes", "")
+    return title, ingredients, instructions, notes
 
 if __name__ == "__main__":
     if len(sys.argv) != 2:
@@ -102,7 +107,9 @@ if __name__ == "__main__":
             "notes": "",
             "error": "Usage: python app.py <tiktok_url>"
         }
-        print(json.dumps(error_result))
+        # Print only JSON
+        sys.stdout.write(json.dumps(error_result))
+        sys.stdout.flush()
         sys.exit(1)
 
     url = sys.argv[1]
@@ -112,10 +119,8 @@ if __name__ == "__main__":
         audio_file = extract_audio(video_file)
         transcript = transcribe_audio(audio_file)
         description = get_tiktok_description(url)
-
         combined_text = f"{transcript}\n\n{description}"
         moderate_text(combined_text)
-
         title, ingredients, steps, notes = parse_with_gpt(transcript, description)
 
         result = {
@@ -124,7 +129,9 @@ if __name__ == "__main__":
             "instructions": steps,
             "notes": notes
         }
-        print(json.dumps(result, indent=2))
+        # Print only JSON
+        sys.stdout.write(json.dumps(result))
+        sys.stdout.flush()
 
     except subprocess.CalledProcessError as e:
         error_result = {
@@ -134,10 +141,10 @@ if __name__ == "__main__":
             "notes": "",
             "error": f"Error occurred while processing video/audio: {str(e)}"
         }
-        print(json.dumps(error_result))
+        sys.stdout.write(json.dumps(error_result))
+        sys.stdout.flush()
         sys.exit(1)
     except ValueError as ve:
-        # Handles moderation failures or JSON parse failures
         error_result = {
             "title": "",
             "ingredients": [],
@@ -145,7 +152,8 @@ if __name__ == "__main__":
             "notes": "",
             "error": str(ve)
         }
-        print(json.dumps(error_result))
+        sys.stdout.write(json.dumps(error_result))
+        sys.stdout.flush()
         sys.exit(1)
     except Exception as ex:
         error_result = {
@@ -155,7 +163,8 @@ if __name__ == "__main__":
             "notes": "",
             "error": f"An unexpected error occurred: {str(ex)}"
         }
-        print(json.dumps(error_result))
+        sys.stdout.write(json.dumps(error_result))
+        sys.stdout.flush()
         sys.exit(1)
     finally:
         if 'video_file' in locals() and os.path.exists(video_file):
