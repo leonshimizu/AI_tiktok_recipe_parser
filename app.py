@@ -15,7 +15,7 @@ client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 
 def download_tiktok_video(url):
     video_filename = f"video_{uuid.uuid4().hex}.mp4"
-    command = ["yt-dlp", url, "-o", video_filename]
+    command = ["yt-dlp", "--verbose", url, "-o", video_filename]
     subprocess.run(command, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     return video_filename
 
