@@ -17,16 +17,21 @@ def create_app(test_config=None):
     def extract():
         data = request.get_json()
         url = data.get('url')
+        zipcode = data.get('zipcode')
         if not url:
             print("DEBUG: No URL provided")
             return jsonify({"error": "No URL provided"}), 400
+        if not zipcode:
+            print("DEBUG: No ZIP code provided")
+            return jsonify({"error": "No zipcode provided"}), 400
 
         print(f"DEBUG: Received URL: {url}")
+        print(f"DEBUG: Received ZIP code: {zipcode}")
 
         try:
-            # Run the app.py script and capture all output
+            # Run the app.py script with url and zipcode and capture all output
             result = subprocess.run(
-                ['python3', 'app.py', url],
+                ['python3', 'app.py', url, zipcode],
                 capture_output=True,
                 text=True
             )
@@ -38,7 +43,7 @@ def create_app(test_config=None):
 
             # Check the return code to see if the subprocess command succeeded
             if result.returncode != 0:
-                # The command failed, this will allow us to see error output
+                # The command failed, show the error output
                 print("ERROR: subprocess returned a non-zero exit code.")
                 return jsonify({"error": f"Failed to process video. Return code: {result.returncode}. STDERR: {result.stderr}"}), 500
 

@@ -1,5 +1,8 @@
 openai==1.57.4
 openai-whisper==20240930
 yt-dlp==2023.10.07
+Flask==2.3.2
 Flask-Cors==3.0.10
-numpy<2.0   # Ensures compatibility with PyTorch/Whisper
+torch==2.2.2
+Pillow==10.0.1
+numpy==1.26.4

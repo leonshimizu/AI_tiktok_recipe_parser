@@ -11,19 +11,15 @@ from openai import OpenAI
 warnings.filterwarnings("ignore")
 
 # Set up the OpenAI client
-client = OpenAI(
-    api_key=os.environ.get("OPENAI_API_KEY")  # defaults to env var if omitted
-)
+client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 
 def download_tiktok_video(url):
     video_filename = f"video_{uuid.uuid4().hex}.mp4"
     command = ["yt-dlp", url, "-o", video_filename]
-    # Capture output so it doesn't print
     subprocess.run(command, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     return video_filename
 
 def get_tiktok_data(url):
-    # We'll now return both description and thumbnail from the dumped JSON
     command = ["yt-dlp", url, "--dump-json"]
     try:
         result = subprocess.run(command, capture_output=True, text=True, check=True)
@@ -41,7 +37,6 @@ def extract_audio(video_file):
         "-ar", "16000", "-ac", "1",
         "-vn", audio_filename, "-y"
     ]
-    # Capture output to avoid printing anything
     subprocess.run(command, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     return audio_filename
 
@@ -55,29 +50,36 @@ def moderate_text(text):
         model="omni-moderation-latest",
         input=text
     )
-    flagged = response.results[0].flagged
-    if flagged:
+    if response.results[0].flagged:
         raise ValueError("The combined transcript and description contain disallowed content.")
     return True
 
-def parse_with_gpt(transcript, description):
+def parse_with_gpt(transcript, description, zipcode):
     prompt = f"""
-You are a cooking assistant. I will provide a cooking video transcript and a video description.
+You are a cooking assistant. I will provide a cooking video transcript, a video description, and a ZIP code.
 
 Your tasks:
-1. Determine a title for the recipe. The title might be found in the description or what the speaker says. If it's unclear, infer a concise, descriptive title based on the dish.
-2. Always provide a measurement for each ingredient.
-   - If the transcript or description explicitly provides a measurement, use it exactly and do not add "(approx.)".
-   - If no measurement is provided, infer a reasonable amount and append "(approx.)" to that ingredient.
-3. Provide a list of instructions (steps) in a logical order.
-4. Include a notes field explaining that some measurements may be approximations.
+1. Determine a title for the recipe.
+2. For each ingredient, always provide a measurement. If no measurement is found, infer one and add "(approx.)".
+3. For each ingredient, provide an approximate cost as "$X.XX". Use ZIP code {zipcode} as a hint but just estimate typical US grocery prices.
+4. Provide a list of instructions in logical order.
+5. Include a notes field saying measurements and costs are approximations.
+6. Add "total_cost_estimate" summing all ingredients into a range like "$X - $Y".
 
-Output in strict JSON format:
+Output in strict JSON:
 {{
   "title": "Some Descriptive Title",
-  "ingredients": [...],
+  "ingredients": [
+    {{
+      "name": "Ingredient Name",
+      "amount": "X unit(s)",
+      "cost": "$X.XX"
+    }},
+    ...
+  ],
   "instructions": [...],
-  "notes": "If an ingredient's amount did not appear in the transcript or description, an approximate amount has been provided and marked with (approx.)."
+  "notes": "...",
+  "total_cost_estimate": "$X - $Y"
 }}
 
 Transcript:
@@ -92,29 +94,24 @@ Description:
         temperature=0
     )
     content = response.choices[0].message.content.strip()
-
-    data = json.loads(content)  # If this fails, it will be handled by the caller
-    title = data.get("title", "")
-    ingredients = data.get("ingredients", [])
-    instructions = data.get("instructions", [])
-    notes = data.get("notes", "")
-    return title, ingredients, instructions, notes
+    data = json.loads(content)
+    return data
 
 if __name__ == "__main__":
-    if len(sys.argv) != 2:
+    if len(sys.argv) != 3:
         error_result = {
             "title": "",
             "ingredients": [],
             "instructions": [],
             "notes": "",
-            "error": "Usage: python app.py <tiktok_url>"
+            "error": "Usage: python app.py <tiktok_url> <zipcode>"
         }
-        # Print only JSON
         sys.stdout.write(json.dumps(error_result))
         sys.stdout.flush()
         sys.exit(1)
 
     url = sys.argv[1]
+    zipcode = sys.argv[2]
 
     try:
         video_file = download_tiktok_video(url)
@@ -123,21 +120,12 @@ if __name__ == "__main__":
         description, thumbnail_url = get_tiktok_data(url)
         combined_text = f"{transcript}\n\n{description}"
         moderate_text(combined_text)
-        title, ingredients, steps, notes = parse_with_gpt(transcript, description)
+        recipe = parse_with_gpt(transcript, description, zipcode)
 
-        result = {
-            "title": title,
-            "ingredients": ingredients,
-            "instructions": steps,
-            "notes": notes
-        }
-
-        # If we got a thumbnail URL, include it in the result
         if thumbnail_url:
-            result["image_url"] = thumbnail_url
+            recipe["image_url"] = thumbnail_url
 
-        # Print only JSON
-        sys.stdout.write(json.dumps(result))
+        sys.stdout.write(json.dumps(recipe))
         sys.stdout.flush()
 
     except subprocess.CalledProcessError as e:
