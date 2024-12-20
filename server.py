@@ -1,4 +1,3 @@
-# server.py
 import os
 import json
 import subprocess
@@ -17,7 +16,7 @@ def create_app(test_config=None):
     def extract():
         data = request.get_json()
         url = data.get('url')
-        location = data.get('zipcode')  # previously 'zipcode', now treat it as a generic 'location'
+        location = data.get('zipcode')  # previously 'zipcode', but now treated as location
         if not url:
             print("DEBUG: No URL provided")
             return jsonify({"error": "No URL provided"}), 400
@@ -29,7 +28,7 @@ def create_app(test_config=None):
         print(f"DEBUG: Received location: {location}")
 
         try:
-            # Run the app.py script with url and location and capture all output
+            # Run the app.py script and capture output
             result = subprocess.run(
                 ['python3', 'app.py', url, location],
                 capture_output=True,
@@ -41,9 +40,8 @@ def create_app(test_config=None):
             print("DEBUG: STDERR from app.py:\n", result.stderr)
             print("DEBUG: Return code:", result.returncode)
 
-            # Check the return code to see if the subprocess command succeeded
             if result.returncode != 0:
-                # The command failed, show the error output
+                # The command failed
                 print("ERROR: subprocess returned a non-zero exit code.")
                 return jsonify({"error": f"Failed to process video. Return code: {result.returncode}. STDERR: {result.stderr}"}), 500
 
@@ -66,6 +64,11 @@ def create_app(test_config=None):
             print("Exception details:", ex)
             return jsonify({"error": f"Unexpected error: {str(ex)}"}), 500
 
+    @app.route('/health', methods=['GET'])
+    def health_check():
+        # Optional: a simple health check route for Render
+        return jsonify({"status": "ok"}), 200
+
     @app.route('/', defaults={'path': ''})
     @app.route('/<path:path>')
     def serve_react(path):
@@ -76,6 +79,9 @@ def create_app(test_config=None):
 
     return app
 
+app = create_app()
+
+# For local testing you can still run the app with: python3 server.py
 if __name__ == '__main__':
-    app = create_app()
-    app.run(host='0.0.0.0', port=3000, debug=True)
+    port = int(os.environ.get('PORT', 3000))  # Read PORT from environment variable
+    app.run(host='0.0.0.0', port=port)
