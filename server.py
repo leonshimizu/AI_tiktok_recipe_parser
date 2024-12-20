@@ -16,7 +16,7 @@ def create_app(test_config=None):
     def extract():
         data = request.get_json()
         url = data.get('url')
-        location = data.get('zipcode')  # previously 'zipcode', but now treated as location
+        location = data.get('zipcode')  # previously 'zipcode', now treated as location
         if not url:
             print("DEBUG: No URL provided")
             return jsonify({"error": "No URL provided"}), 400
@@ -28,7 +28,7 @@ def create_app(test_config=None):
         print(f"DEBUG: Received location: {location}")
 
         try:
-            # Run the app.py script and capture output
+            # Run app.py with URL and location, capturing output
             result = subprocess.run(
                 ['python3', 'app.py', url, location],
                 capture_output=True,
@@ -55,7 +55,7 @@ def create_app(test_config=None):
             print("STDOUT:", e.stdout)
             print("STDERR:", e.stderr)
             return jsonify({"error": f"Failed to process video: {str(e)}"}), 500
-        except json.JSONDecodeError as je:
+        except json.JSONDecodeError:
             print("ERROR: JSONDecodeError encountered.")
             print("RAW output that caused error:", result.stdout)
             return jsonify({"error": "Invalid JSON output from app.py"}), 500
@@ -66,7 +66,7 @@ def create_app(test_config=None):
 
     @app.route('/health', methods=['GET'])
     def health_check():
-        # Optional: a simple health check route for Render
+        # Optional health check route for Render
         return jsonify({"status": "ok"}), 200
 
     @app.route('/', defaults={'path': ''})
@@ -79,9 +79,9 @@ def create_app(test_config=None):
 
     return app
 
+# Create the app at module level so gunicorn can access it
 app = create_app()
 
-# For local testing you can still run the app with: python3 server.py
 if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 3000))  # Read PORT from environment variable
+    port = int(os.environ.get('PORT', 3000))
     app.run(host='0.0.0.0', port=port)
