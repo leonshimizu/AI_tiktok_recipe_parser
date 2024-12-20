@@ -54,32 +54,48 @@ def moderate_text(text):
         raise ValueError("The combined transcript and description contain disallowed content.")
     return True
 
-def parse_with_gpt(transcript, description, zipcode):
+def parse_with_gpt(transcript, description, location):
+    # Updated prompt: location can be anywhere in the world, and we emphasize accuracy.
     prompt = f"""
-You are a cooking assistant. I will provide a cooking video transcript, a video description, and a ZIP code.
+You are a highly knowledgeable cooking assistant. I will provide a cooking video transcript, a video description, and a location (which can be anywhere in the world).
 
 Your tasks:
-1. Determine a title for the recipe.
-2. For each ingredient, always provide a measurement. If no measurement is found, infer one and add "(approx.)".
-3. For each ingredient, provide an approximate cost as "$X.XX". Use ZIP code {zipcode} as a hint but just estimate typical US grocery prices.
-4. Provide a list of instructions in logical order.
-5. Include a notes field saying measurements and costs are approximations.
-6. Add "total_cost_estimate" summing all ingredients into a range like "$X - $Y".
+1. Determine a concise, descriptive, and accurate title for the recipe. If unclear, infer the best possible title.
+2. For each ingredient, always provide a measurement. If no measurement is found, infer a reasonable amount and append "(approx.)".
+3. Estimate the local cost of each ingredient in the given location: "{location}". Provide approximate cost as a local currency price, e.g., "X.XX (local currency)". If unsure of currency, choose one that might be appropriate for that location (e.g., if location is "Tokyo, Japan", use JPY; if "Berlin, Germany" use EUR).
+4. For each ingredient, also estimate macros (protein, carbs, fat, calories) as accurately as possible. If unsure, make a reasonable guess based on common nutritional data. Be careful and do your best.
+5. Provide a clear list of instructions in logical order.
+6. Include a notes field stating that measurements, costs, and macros are approximations.
+7. Add "total_cost_estimate" summing all ingredients into a range like "X - Y (local currency)".
+8. Add "total_macros" field summarizing total protein (g), carbs (g), fat (g), and calories for the entire dish as accurately as possible.
+9. Add a "servings" field indicating how many servings this recipe makes. If unsure, infer a reasonable number.
+   - If servings > 1, we will show macros per serving on the frontend, but you still provide total macros for the entire dish.
 
-Output in strict JSON:
+Output in strict JSON format. Use a structure like this:
 {{
   "title": "Some Descriptive Title",
+  "servings": X,
   "ingredients": [
     {{
       "name": "Ingredient Name",
       "amount": "X unit(s)",
-      "cost": "$X.XX"
+      "cost": "X.XX (local currency)",
+      "protein_g": X,
+      "carbs_g": X,
+      "fat_g": X,
+      "calories": X
     }},
     ...
   ],
   "instructions": [...],
-  "notes": "...",
-  "total_cost_estimate": "$X - $Y"
+  "notes": "Measurements, costs, and macros are approximate.",
+  "total_cost_estimate": "X - Y (local currency)",
+  "total_macros": {{
+    "protein_g": X,
+    "carbs_g": X,
+    "fat_g": X,
+    "calories": X
+  }}
 }}
 
 Transcript:
@@ -87,6 +103,7 @@ Transcript:
 
 Description:
 \"\"\"{description}\"\"\"
+Location: \"{location}\" 
 """
     response = client.chat.completions.create(
         model="gpt-3.5-turbo",
@@ -104,14 +121,14 @@ if __name__ == "__main__":
             "ingredients": [],
             "instructions": [],
             "notes": "",
-            "error": "Usage: python app.py <tiktok_url> <zipcode>"
+            "error": "Usage: python app.py <tiktok_url> <location>"
         }
         sys.stdout.write(json.dumps(error_result))
         sys.stdout.flush()
         sys.exit(1)
 
     url = sys.argv[1]
-    zipcode = sys.argv[2]
+    location = sys.argv[2]
 
     try:
         video_file = download_tiktok_video(url)
@@ -120,7 +137,7 @@ if __name__ == "__main__":
         description, thumbnail_url = get_tiktok_data(url)
         combined_text = f"{transcript}\n\n{description}"
         moderate_text(combined_text)
-        recipe = parse_with_gpt(transcript, description, zipcode)
+        recipe = parse_with_gpt(transcript, description, location)
 
         if thumbnail_url:
             recipe["image_url"] = thumbnail_url

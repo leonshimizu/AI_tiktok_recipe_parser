@@ -17,21 +17,21 @@ def create_app(test_config=None):
     def extract():
         data = request.get_json()
         url = data.get('url')
-        zipcode = data.get('zipcode')
+        location = data.get('zipcode')  # previously 'zipcode', now treat it as a generic 'location'
         if not url:
             print("DEBUG: No URL provided")
             return jsonify({"error": "No URL provided"}), 400
-        if not zipcode:
-            print("DEBUG: No ZIP code provided")
-            return jsonify({"error": "No zipcode provided"}), 400
+        if not location:
+            print("DEBUG: No location provided")
+            return jsonify({"error": "No location provided"}), 400
 
         print(f"DEBUG: Received URL: {url}")
-        print(f"DEBUG: Received ZIP code: {zipcode}")
+        print(f"DEBUG: Received location: {location}")
 
         try:
-            # Run the app.py script with url and zipcode and capture all output
+            # Run the app.py script with url and location and capture all output
             result = subprocess.run(
-                ['python3', 'app.py', url, zipcode],
+                ['python3', 'app.py', url, location],
                 capture_output=True,
                 text=True
             )
@@ -53,7 +53,6 @@ def create_app(test_config=None):
             return jsonify(recipe_data), 200
 
         except subprocess.CalledProcessError as e:
-            # This shouldn't happen if we handle returncode ourselves, but just in case
             print("ERROR: subprocess.CalledProcessError encountered.")
             print("STDOUT:", e.stdout)
             print("STDERR:", e.stderr)
@@ -67,7 +66,6 @@ def create_app(test_config=None):
             print("Exception details:", ex)
             return jsonify({"error": f"Unexpected error: {str(ex)}"}), 500
 
-    # Serve React frontend
     @app.route('/', defaults={'path': ''})
     @app.route('/<path:path>')
     def serve_react(path):
