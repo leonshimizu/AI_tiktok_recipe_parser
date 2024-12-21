@@ -14,8 +14,19 @@ warnings.filterwarnings("ignore")
 client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 
 def download_tiktok_video(url):
+    """
+    Downloads a video from the given URL (TikTok, YouTube Shorts, etc.)
+    using yt-dlp. Forces best video + best audio, then merges to mp4.
+    """
     video_filename = f"video_{uuid.uuid4().hex}.mp4"
-    command = ["yt-dlp", "--verbose", url, "-o", video_filename]
+    command = [
+        "yt-dlp",
+        "--verbose",
+        "-f", "bv*+ba/b",            # Pick bestvideo+bestaudio if available, else fallback
+        "--merge-output-format", "mp4",  # Merge into a single MP4
+        url,
+        "-o", video_filename
+    ]
     subprocess.run(command, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     return video_filename
 
@@ -31,6 +42,9 @@ def get_tiktok_data(url):
         return "", ""
 
 def extract_audio(video_file):
+    """
+    Extracts audio from the merged MP4, to a WAV file with 16kHz / 1 channel.
+    """
     audio_filename = f"audio_{uuid.uuid4().hex}.wav"
     command = [
         "ffmpeg", "-i", video_file,
@@ -41,11 +55,18 @@ def extract_audio(video_file):
     return audio_filename
 
 def transcribe_audio(audio_file):
+    """
+    Uses openai-whisper (whisper) to transcribe the WAV audio.
+    """
     model = whisper.load_model("base")
     result = model.transcribe(audio_file)
     return result["text"]
 
 def moderate_text(text):
+    """
+    Check transcript + description with OpenAI's moderation endpoint.
+    If flagged, raise ValueError.
+    """
     response = client.moderations.create(
         model="omni-moderation-latest",
         input=text
@@ -55,21 +76,29 @@ def moderate_text(text):
     return True
 
 def parse_with_gpt(transcript, description, location):
-    # Updated prompt: location can be anywhere in the world, and we emphasize accuracy.
+    """
+    Ask GPT to produce a structured JSON recipe with cost, macros,
+    and an inferred number of servings, using 'location' as a hint for local prices.
+    """
     prompt = f"""
-You are a highly knowledgeable cooking assistant. I will provide a cooking video transcript, a video description, and a location (which can be anywhere in the world).
+You are a highly knowledgeable cooking assistant. I will provide a cooking video transcript, 
+a video description, and a location (which can be anywhere in the world).
 
 Your tasks:
-1. Determine a concise, descriptive, and accurate title for the recipe. If unclear, infer the best possible title.
+1. Determine a concise, descriptive, and accurate title for the recipe. 
 2. For each ingredient, always provide a measurement. If no measurement is found, infer a reasonable amount and append "(approx.)".
-3. Estimate the local cost of each ingredient in the given location: "{location}". Provide approximate cost as a local currency price, e.g., "X.XX (local currency)". If unsure of currency, choose one that might be appropriate for that location (e.g., if location is "Tokyo, Japan", use JPY; if "Berlin, Germany" use EUR).
-4. For each ingredient, also estimate macros (protein, carbs, fat, calories) as accurately as possible. If unsure, make a reasonable guess based on common nutritional data. Be careful and do your best.
+3. Estimate the local cost of each ingredient in the given location: "{location}". 
+   Provide approximate cost as a local currency price, e.g., "X.XX (local currency)". 
+   If unsure of currency, choose one that might be appropriate for that location 
+   (e.g., if location is "Tokyo, Japan", use JPY).
+4. For each ingredient, also estimate macros (protein, carbs, fat, calories) as accurately as possible.
 5. Provide a clear list of instructions in logical order.
 6. Include a notes field stating that measurements, costs, and macros are approximations.
 7. Add "total_cost_estimate" summing all ingredients into a range like "X - Y (local currency)".
-8. Add "total_macros" field summarizing total protein (g), carbs (g), fat (g), and calories for the entire dish as accurately as possible.
-9. Add a "servings" field indicating how many servings this recipe makes. If unsure, infer a reasonable number.
-   - If servings > 1, we will show macros per serving on the frontend, but you still provide total macros for the entire dish.
+8. Add "total_macros" summarizing total protein, carbs, fat, and calories for the entire dish.
+9. Add a "servings" field indicating how many servings this recipe makes. 
+   - If servings > 1, we will show macros per serving on the frontend, 
+     but you still provide total macros for the entire dish.
 
 Output in strict JSON format. Use a structure like this:
 {{
@@ -103,7 +132,7 @@ Transcript:
 
 Description:
 \"\"\"{description}\"\"\"
-Location: \"{location}\" 
+Location: \"{location}\"
 """
     response = client.chat.completions.create(
         model="gpt-3.5-turbo",
@@ -115,6 +144,7 @@ Location: \"{location}\"
     return data
 
 if __name__ == "__main__":
+    # Expecting exactly 2 arguments: <url> <location>
     if len(sys.argv) != 3:
         error_result = {
             "title": "",
@@ -131,21 +161,35 @@ if __name__ == "__main__":
     location = sys.argv[2]
 
     try:
+        # 1. Download
         video_file = download_tiktok_video(url)
+
+        # 2. Extract Audio
         audio_file = extract_audio(video_file)
+
+        # 3. Transcribe
         transcript = transcribe_audio(audio_file)
+
+        # 4. Gather description + thumbnail
         description, thumbnail_url = get_tiktok_data(url)
+
+        # 5. Moderate
         combined_text = f"{transcript}\n\n{description}"
         moderate_text(combined_text)
+
+        # 6. Parse with GPT
         recipe = parse_with_gpt(transcript, description, location)
 
+        # If we got a thumbnail URL, include it in the result
         if thumbnail_url:
             recipe["image_url"] = thumbnail_url
 
+        # Print JSON
         sys.stdout.write(json.dumps(recipe))
         sys.stdout.flush()
 
     except subprocess.CalledProcessError as e:
+        # If either yt-dlp or ffmpeg fails
         error_result = {
             "title": "",
             "ingredients": [],
@@ -157,6 +201,7 @@ if __name__ == "__main__":
         sys.stdout.flush()
         sys.exit(1)
     except ValueError as ve:
+        # If moderation or JSON decode fails
         error_result = {
             "title": "",
             "ingredients": [],
@@ -168,6 +213,7 @@ if __name__ == "__main__":
         sys.stdout.flush()
         sys.exit(1)
     except Exception as ex:
+        # Catch-all
         error_result = {
             "title": "",
             "ingredients": [],
@@ -179,6 +225,7 @@ if __name__ == "__main__":
         sys.stdout.flush()
         sys.exit(1)
     finally:
+        # Cleanup
         if 'video_file' in locals() and os.path.exists(video_file):
             os.remove(video_file)
         if 'audio_file' in locals() and os.path.exists(audio_file):
