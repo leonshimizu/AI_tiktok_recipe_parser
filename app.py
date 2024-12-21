@@ -1,3 +1,4 @@
+# app.py
 import sys
 import subprocess
 import uuid
@@ -6,6 +7,9 @@ import json
 import whisper
 import warnings
 from openai import OpenAI
+
+# If using caching or DB helpers, uncomment as needed:
+# from store import get_recipe_from_db, store_recipe_in_db
 
 # Suppress Python warnings
 warnings.filterwarnings("ignore")
@@ -81,8 +85,7 @@ def moderate_text(text):
 def parse_with_gpt(transcript, description, location):
     """
     Updated prompt to produce a structured JSON recipe with cost, macros,
-    an inferred number of servings, cooking/prep times, equipment, and
-    dietary substitutions.
+    an inferred number of servings, cooking/prep times, equipment, dietary substitutions, etc.
     """
     prompt = f"""
 You are a highly knowledgeable cooking assistant. I will provide a cooking video transcript, 
@@ -178,6 +181,13 @@ if __name__ == "__main__":
     url = sys.argv[1]
     location = sys.argv[2]
 
+    # Optionally, if using caching:
+    # existing_transcript, existing_recipe = get_recipe_from_db(url)
+    # if existing_recipe:
+    #     sys.stdout.write(json.dumps(existing_recipe))
+    #     sys.stdout.flush()
+    #     sys.exit(0)
+
     try:
         # 1. Download
         video_file = download_tiktok_video(url)
@@ -201,6 +211,9 @@ if __name__ == "__main__":
         # If we got a thumbnail URL, include it
         if thumbnail_url:
             recipe["image_url"] = thumbnail_url
+
+        # Optionally store in DB:
+        # store_recipe_in_db(url, transcript, recipe)
 
         # Print JSON
         sys.stdout.write(json.dumps(recipe))

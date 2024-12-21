@@ -6,8 +6,15 @@ import {
   UtensilsCrossed,
   ScrollText,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
 } from 'lucide-react';
+
+// Import your additional components
+import LoginForm from './Login';
+import RegisterForm from './RegisterForm';
+import Favorites from './Favorites';
+// If you have an AddFavorite component, import it as well
+// import AddFavorite from './AddFavorite';
 
 interface Ingredient {
   name: string;
@@ -26,7 +33,6 @@ interface TotalMacros {
   calories: number;
 }
 
-// NEW: Additional fields for equipment, times, and dietary subs
 interface DietarySubstitutions {
   [restriction: string]: string;
 }
@@ -41,7 +47,7 @@ interface Recipe {
   total_cost_estimate?: string;
   total_macros?: TotalMacros;
 
-  // Additional fields
+  // Additional fields for the new features
   prep_time_minutes?: number;
   cook_time_minutes?: number;
   equipment?: string[];
@@ -54,15 +60,20 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [recipe, setRecipe] = useState<Recipe | null>(null);
   const [error, setError] = useState('');
+  
+  // For collapsible UI sections
   const [showMacros, setShowMacros] = useState(false);
-
-  // Collapsible toggles for new sections
   const [showEquipment, setShowEquipment] = useState(false);
   const [showSubstitutions, setShowSubstitutions] = useState(false);
 
-  // Track if the image failed to load
+  // For image loading errors
   const [imageError, setImageError] = useState(false);
 
+  // Simple nav state to demo multiple pages
+  type ViewOption = 'recipe' | 'login' | 'register' | 'favorites';
+  const [view, setView] = useState<ViewOption>('recipe');
+
+  // Submit logic
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -73,6 +84,8 @@ function App() {
       const response = await fetch('/extract', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        // If your server uses sessions with credentials:
+        // credentials: 'include',
         body: JSON.stringify({ url, zipcode: location }),
       });
 
@@ -90,11 +103,12 @@ function App() {
     }
   };
 
-  const toggleMacros = () => setShowMacros(!showMacros);
-  const toggleEquipment = () => setShowEquipment(!showEquipment);
-  const toggleSubstitutions = () => setShowSubstitutions(!showSubstitutions);
+  // Toggles
+  const toggleMacros = () => setShowMacros((prev) => !prev);
+  const toggleEquipment = () => setShowEquipment((prev) => !prev);
+  const toggleSubstitutions = () => setShowSubstitutions((prev) => !prev);
 
-  // Renders macros
+  // Render Macros
   const renderMacros = () => {
     if (!recipe?.total_macros) return null;
     const { protein_g, carbs_g, fat_g, calories } = recipe.total_macros;
@@ -126,7 +140,6 @@ function App() {
               <p>Fat: {fat_g} g</p>
               <p>Calories: {calories}</p>
             </div>
-
             {servings > 1 && (
               <div>
                 <h4 className="font-semibold">Per Serving (Serves {servings}):</h4>
@@ -142,7 +155,7 @@ function App() {
     );
   };
 
-  // Renders equipment & times
+  // Render Equipment & Times
   const renderEquipmentAndTimes = () => {
     if (!recipe) return null;
     const { prep_time_minutes, cook_time_minutes, equipment } = recipe;
@@ -180,7 +193,7 @@ function App() {
     );
   };
 
-  // Renders dietary substitutions
+  // Render Dietary Substitutions
   const renderDietarySubstitutions = () => {
     if (!recipe?.dietary_substitutions) return null;
     const subs = recipe.dietary_substitutions;
@@ -213,165 +226,219 @@ function App() {
     );
   };
 
+  // -----------------------
+  // Main Render
+  // -----------------------
   return (
     <div className="min-h-screen bg-gradient-to-br from-pink-50 to-purple-50">
       <div className="max-w-4xl mx-auto px-4 py-12">
-        {/* Header */}
-        <div className="text-center mb-12">
-          <div className="flex items-center justify-center mb-4">
-            <ChefHat className="w-12 h-12 text-purple-600" />
-          </div>
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">
-            TikTok Recipe Extractor
-          </h1>
-          <p className="text-lg text-gray-600">
-            Transform your favorite short cooking videos into detailed recipes with cost, macros,
-            equipment lists, times, and dietary substitutions!
-          </p>
-        </div>
-
-        {/* Input Form */}
-        <form onSubmit={handleSubmit} className="mb-12 space-y-4">
-          <input
-            type="url"
-            value={url}
-            onChange={(e) => setUrl(e.target.value)}
-            placeholder="Paste video URL here..."
-            className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition"
-            required
-          />
-          <input
-            type="text"
-            value={location}
-            onChange={(e) => setLocation(e.target.value)}
-            placeholder="Enter your location (city, country)..."
-            className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition"
-            required
-          />
-
+        
+        {/* Simple navigation for demonstration */}
+        <nav className="flex gap-4 mb-8">
           <button
-            type="submit"
-            disabled={loading}
-            className="mt-4 bg-purple-600 text-white px-8 py-3 rounded-lg font-semibold hover:bg-purple-700 transition flex items-center justify-center gap-2 disabled:opacity-50"
+            onClick={() => setView('recipe')}
+            className="text-blue-600 underline"
           >
-            {loading ? (
-              <Loader2 className="w-5 h-5 animate-spin" />
-            ) : (
-              <>
-                <Link2 className="w-5 h-5" />
-                Extract Recipe
-              </>
-            )}
+            Recipe
           </button>
-        </form>
+          <button
+            onClick={() => setView('favorites')}
+            className="text-blue-600 underline"
+          >
+            Favorites
+          </button>
+          <button
+            onClick={() => setView('login')}
+            className="text-blue-600 underline"
+          >
+            Login
+          </button>
+          <button
+            onClick={() => setView('register')}
+            className="text-blue-600 underline"
+          >
+            Register
+          </button>
+        </nav>
 
-        {/* Error Message */}
-        {error && (
-          <div className="mb-8 p-4 bg-red-50 border border-red-200 rounded-lg text-red-600">
-            {error}
-          </div>
-        )}
-
-        {/* Recipe Output */}
-        {recipe && (
-          <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
-            {/* Only render <img> if we have a URL and haven't encountered an error */}
-            {recipe.image_url && !imageError && (
-              <img
-                src={recipe.image_url}
-                alt="Recipe"
-                className="w-full h-64 object-cover"
-                onError={() => setImageError(true)}
-              />
-            )}
-            <div className="p-6 md:p-8 space-y-6">
-              {/* Title */}
-              {recipe.title && (
-                <h2 className="text-2xl font-bold text-gray-900">{recipe.title}</h2>
-              )}
-
-              {/* Servings */}
-              {recipe.servings && recipe.servings > 0 && (
-                <div className="text-gray-700">
-                  <p>
-                    <strong>Servings:</strong> {recipe.servings}
-                  </p>
-                </div>
-              )}
-
-              {/* Equipment & Times */}
-              {renderEquipmentAndTimes()}
-
-              {/* Ingredients */}
-              {recipe.ingredients && recipe.ingredients.length > 0 && (
-                <div>
-                  <div className="flex items-center gap-2 mb-4">
-                    <UtensilsCrossed className="w-6 h-6 text-purple-600" />
-                    <h3 className="text-xl font-semibold text-gray-900">
-                      Ingredients &amp; Costs
-                    </h3>
-                  </div>
-                  <ul className="space-y-4">
-                    {recipe.ingredients.map((ingredient, index) => (
-                      <li key={index} className="flex flex-col text-gray-700">
-                        <div className="flex gap-2 items-center">
-                          <span className="text-purple-600 font-medium">•</span>
-                          <span className="font-semibold">
-                            {ingredient.name} ({ingredient.amount})
-                          </span>
-                          <span className="text-sm text-gray-500">
-                            {ingredient.cost}
-                          </span>
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              {/* Instructions */}
-              {recipe.instructions && recipe.instructions.length > 0 && (
-                <div>
-                  <div className="flex items-center gap-2 mb-4">
-                    <ScrollText className="w-6 h-6 text-purple-600" />
-                    <h3 className="text-xl font-semibold text-gray-900">
-                      Instructions
-                    </h3>
-                  </div>
-                  <ol className="space-y-3 list-decimal list-inside text-gray-700">
-                    {recipe.instructions.map((instruction, index) => (
-                      <li key={index}>{instruction}</li>
-                    ))}
-                  </ol>
-                </div>
-              )}
-
-              {/* Notes */}
-              {recipe.notes && (
-                <div>
-                  <h3 className="text-xl font-semibold text-gray-900 mb-2">Notes</h3>
-                  <p className="text-gray-700">{recipe.notes}</p>
-                </div>
-              )}
-
-              {/* Total Cost */}
-              {recipe.total_cost_estimate && (
-                <div>
-                  <h3 className="text-xl font-semibold text-gray-900 mb-2">
-                    Total Cost Estimate
-                  </h3>
-                  <p className="text-gray-700">{recipe.total_cost_estimate}</p>
-                </div>
-              )}
-
-              {/* Macros */}
-              {renderMacros()}
-
-              {/* Dietary Substitutions */}
-              {renderDietarySubstitutions()}
+        {view === 'recipe' && (
+          <>
+            {/* Header */}
+            <div className="text-center mb-12">
+              <div className="flex items-center justify-center mb-4">
+                <ChefHat className="w-12 h-12 text-purple-600" />
+              </div>
+              <h1 className="text-4xl font-bold text-gray-900 mb-4">
+                TikTok Recipe Extractor
+              </h1>
+              <p className="text-lg text-gray-600">
+                Transform your favorite short cooking videos into detailed recipes with cost, macros,
+                equipment lists, times, and dietary substitutions!
+              </p>
             </div>
-          </div>
+
+            {/* Input Form */}
+            <form onSubmit={handleSubmit} className="mb-12 space-y-4">
+              <input
+                type="url"
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+                placeholder="Paste video URL here..."
+                className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition"
+                required
+              />
+              <input
+                type="text"
+                value={location}
+                onChange={(e) => setLocation(e.target.value)}
+                placeholder="Enter your location (city, country)..."
+                className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition"
+                required
+              />
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="mt-4 bg-purple-600 text-white px-8 py-3 rounded-lg font-semibold hover:bg-purple-700 transition flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                {loading ? (
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                ) : (
+                  <>
+                    <Link2 className="w-5 h-5" />
+                    Extract Recipe
+                  </>
+                )}
+              </button>
+            </form>
+
+            {/* Error Message */}
+            {error && (
+              <div className="mb-8 p-4 bg-red-50 border border-red-200 rounded-lg text-red-600">
+                {error}
+              </div>
+            )}
+
+            {/* Recipe Output */}
+            {recipe && (
+              <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
+                {/* Only render <img> if we have a URL and haven't encountered an error */}
+                {recipe.image_url && !imageError && (
+                  <img
+                    src={recipe.image_url}
+                    alt="Recipe"
+                    className="w-full h-64 object-cover"
+                    onError={() => setImageError(true)}
+                  />
+                )}
+                <div className="p-6 md:p-8 space-y-6">
+                  {/* Title */}
+                  {recipe.title && (
+                    <h2 className="text-2xl font-bold text-gray-900">{recipe.title}</h2>
+                  )}
+
+                  {/* Servings */}
+                  {recipe.servings && recipe.servings > 0 && (
+                    <div className="text-gray-700">
+                      <p>
+                        <strong>Servings:</strong> {recipe.servings}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Equipment & Times */}
+                  {renderEquipmentAndTimes()}
+
+                  {/* Ingredients */}
+                  {recipe.ingredients && recipe.ingredients.length > 0 && (
+                    <div>
+                      <div className="flex items-center gap-2 mb-4">
+                        <UtensilsCrossed className="w-6 h-6 text-purple-600" />
+                        <h3 className="text-xl font-semibold text-gray-900">
+                          Ingredients &amp; Costs
+                        </h3>
+                      </div>
+                      <ul className="space-y-4">
+                        {recipe.ingredients.map((ingredient, index) => (
+                          <li key={index} className="flex flex-col text-gray-700">
+                            <div className="flex gap-2 items-center">
+                              <span className="text-purple-600 font-medium">•</span>
+                              <span className="font-semibold">
+                                {ingredient.name} ({ingredient.amount})
+                              </span>
+                              <span className="text-sm text-gray-500">
+                                {ingredient.cost}
+                              </span>
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* Instructions */}
+                  {recipe.instructions && recipe.instructions.length > 0 && (
+                    <div>
+                      <div className="flex items-center gap-2 mb-4">
+                        <ScrollText className="w-6 h-6 text-purple-600" />
+                        <h3 className="text-xl font-semibold text-gray-900">
+                          Instructions
+                        </h3>
+                      </div>
+                      <ol className="space-y-3 list-decimal list-inside text-gray-700">
+                        {recipe.instructions.map((instruction, index) => (
+                          <li key={index}>{instruction}</li>
+                        ))}
+                      </ol>
+                    </div>
+                  )}
+
+                  {/* Notes */}
+                  {recipe.notes && (
+                    <div>
+                      <h3 className="text-xl font-semibold text-gray-900 mb-2">Notes</h3>
+                      <p className="text-gray-700">{recipe.notes}</p>
+                    </div>
+                  )}
+
+                  {/* Total Cost */}
+                  {recipe.total_cost_estimate && (
+                    <div>
+                      <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                        Total Cost Estimate
+                      </h3>
+                      <p className="text-gray-700">{recipe.total_cost_estimate}</p>
+                    </div>
+                  )}
+
+                  {/* Macros */}
+                  {renderMacros()}
+
+                  {/* Dietary Substitutions */}
+                  {renderDietarySubstitutions()}
+
+                  {/* If you want a separate "Favorite This Recipe" button: */}
+                  {/*
+                    <AddFavorite recipeUrl={url} />
+                  */}
+                </div>
+              </div>
+            )}
+          </>
         )}
+
+        {view === 'favorites' && (
+          <Favorites />
+        )}
+
+        {view === 'login' && (
+          <LoginForm />
+        )}
+
+        {view === 'register' && (
+          <RegisterForm />
+        )}
+
       </div>
     </div>
   );

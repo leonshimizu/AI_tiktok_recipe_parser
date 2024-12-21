@@ -9,10 +9,32 @@ export default defineConfig({
   },
   server: {
     proxy: {
+      // Proxy each route to your Flask server at :3000
+      '/register': {
+        target: 'http://127.0.0.1:3000',  // or localhost
+        changeOrigin: true,
+      },
+      '/login': {
+        target: 'http://127.0.0.1:3000',
+        changeOrigin: true,
+      },
+      '/logout': {
+        target: 'http://127.0.0.1:3000',
+        changeOrigin: true,
+      },
+      '/favorites': {
+        target: 'http://127.0.0.1:3000',
+        changeOrigin: true,
+      },
       '/extract': {
-        target: 'http://127.0.0.1:3000',  // use 127.0.0.1 or localhost
-        changeOrigin: true
-      }
-    }
-  }
+        target: 'http://127.0.0.1:3000',
+        changeOrigin: true,
+      },
+      // If you want a wildcard catch-all, you could do:
+      // '/': {
+      //   target: 'http://127.0.0.1:3000',
+      //   changeOrigin: true,
+      // },
+    },
+  },
 });
