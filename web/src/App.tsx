@@ -1,5 +1,13 @@
 import React, { useState } from 'react';
-import { ChefHat, Loader2, Link2, UtensilsCrossed, ScrollText, ChevronDown, ChevronUp } from 'lucide-react';
+import {
+  ChefHat,
+  Loader2,
+  Link2,
+  UtensilsCrossed,
+  ScrollText,
+  ChevronDown,
+  ChevronUp
+} from 'lucide-react';
 
 interface Ingredient {
   name: string;
@@ -18,6 +26,11 @@ interface TotalMacros {
   calories: number;
 }
 
+// NEW: Additional fields for equipment, times, and dietary subs
+interface DietarySubstitutions {
+  [restriction: string]: string;
+}
+
 interface Recipe {
   title?: string;
   servings?: number;
@@ -27,6 +40,12 @@ interface Recipe {
   notes?: string;
   total_cost_estimate?: string;
   total_macros?: TotalMacros;
+
+  // Additional fields
+  prep_time_minutes?: number;
+  cook_time_minutes?: number;
+  equipment?: string[];
+  dietary_substitutions?: DietarySubstitutions;
 }
 
 function App() {
@@ -37,7 +56,11 @@ function App() {
   const [error, setError] = useState('');
   const [showMacros, setShowMacros] = useState(false);
 
-  // NEW: Track if the image failed to load
+  // Collapsible toggles for new sections
+  const [showEquipment, setShowEquipment] = useState(false);
+  const [showSubstitutions, setShowSubstitutions] = useState(false);
+
+  // Track if the image failed to load
   const [imageError, setImageError] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -59,7 +82,6 @@ function App() {
 
       const data: Recipe = await response.json();
       setRecipe(data);
-      // Reset image error in case user re-submits
       setImageError(false);
     } catch (err) {
       setError('Failed to extract recipe. Please check the URL and try again.');
@@ -68,13 +90,13 @@ function App() {
     }
   };
 
-  const toggleMacros = () => {
-    setShowMacros((prev) => !prev);
-  };
+  const toggleMacros = () => setShowMacros(!showMacros);
+  const toggleEquipment = () => setShowEquipment(!showEquipment);
+  const toggleSubstitutions = () => setShowSubstitutions(!showSubstitutions);
 
+  // Renders macros
   const renderMacros = () => {
-    if (!recipe || !recipe.total_macros) return null;
-
+    if (!recipe?.total_macros) return null;
     const { protein_g, carbs_g, fat_g, calories } = recipe.total_macros;
     const servings = recipe.servings && recipe.servings > 0 ? recipe.servings : 1;
 
@@ -91,15 +113,8 @@ function App() {
             onClick={toggleMacros}
             className="text-sm text-purple-600 hover:underline flex items-center gap-1"
           >
-            {showMacros ? (
-              <>
-                Hide Macros <ChevronUp className="w-4 h-4" />
-              </>
-            ) : (
-              <>
-                Show Macros <ChevronDown className="w-4 h-4" />
-              </>
-            )}
+            {showMacros ? 'Hide' : 'Show'}
+            {showMacros ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
           </button>
         </h3>
         {showMacros && (
@@ -127,9 +142,81 @@ function App() {
     );
   };
 
+  // Renders equipment & times
+  const renderEquipmentAndTimes = () => {
+    if (!recipe) return null;
+    const { prep_time_minutes, cook_time_minutes, equipment } = recipe;
+    if (!prep_time_minutes && !cook_time_minutes && !equipment) return null;
+
+    return (
+      <div className="mt-4">
+        <h3 className="text-xl font-semibold text-gray-900 mb-2 flex items-center justify-between">
+          Equipment & Times
+          <button
+            onClick={toggleEquipment}
+            className="text-sm text-purple-600 hover:underline flex items-center gap-1"
+          >
+            {showEquipment ? 'Hide' : 'Show'}
+            {showEquipment ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+          </button>
+        </h3>
+        {showEquipment && (
+          <div className="text-gray-700 space-y-4">
+            {prep_time_minutes && <p>Prep time: {prep_time_minutes} minutes</p>}
+            {cook_time_minutes && <p>Cook time: {cook_time_minutes} minutes</p>}
+            {equipment && equipment.length > 0 && (
+              <div>
+                <p className="font-semibold">Equipment needed:</p>
+                <ul className="list-disc list-inside pl-5 space-y-1">
+                  {equipment.map((item, index) => (
+                    <li key={index}>{item}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // Renders dietary substitutions
+  const renderDietarySubstitutions = () => {
+    if (!recipe?.dietary_substitutions) return null;
+    const subs = recipe.dietary_substitutions;
+    const restrictionKeys = Object.keys(subs);
+    if (restrictionKeys.length === 0) return null;
+
+    return (
+      <div className="mt-4">
+        <h3 className="text-xl font-semibold text-gray-900 mb-2 flex items-center justify-between">
+          Dietary Substitutions
+          <button
+            onClick={toggleSubstitutions}
+            className="text-sm text-purple-600 hover:underline flex items-center gap-1"
+          >
+            {showSubstitutions ? 'Hide' : 'Show'}
+            {showSubstitutions ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+          </button>
+        </h3>
+        {showSubstitutions && (
+          <div className="text-gray-700 space-y-4">
+            {restrictionKeys.map((key) => (
+              <div key={key}>
+                <p className="font-semibold capitalize">{key.replace('_', ' ')}:</p>
+                <p>{subs[key]}</p>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-pink-50 to-purple-50">
       <div className="max-w-4xl mx-auto px-4 py-12">
+        {/* Header */}
         <div className="text-center mb-12">
           <div className="flex items-center justify-center mb-4">
             <ChefHat className="w-12 h-12 text-purple-600" />
@@ -138,17 +225,18 @@ function App() {
             TikTok Recipe Extractor
           </h1>
           <p className="text-lg text-gray-600">
-            Transform your favorite TikTok cooking videos into detailed recipes,
-            with cost and macro estimates tailored to your location!
+            Transform your favorite short cooking videos into detailed recipes with cost, macros,
+            equipment lists, times, and dietary substitutions!
           </p>
         </div>
 
+        {/* Input Form */}
         <form onSubmit={handleSubmit} className="mb-12 space-y-4">
           <input
             type="url"
             value={url}
             onChange={(e) => setUrl(e.target.value)}
-            placeholder="Paste TikTok URL here..."
+            placeholder="Paste video URL here..."
             className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition"
             required
           />
@@ -177,12 +265,14 @@ function App() {
           </button>
         </form>
 
+        {/* Error Message */}
         {error && (
           <div className="mb-8 p-4 bg-red-50 border border-red-200 rounded-lg text-red-600">
             {error}
           </div>
         )}
 
+        {/* Recipe Output */}
         {recipe && (
           <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
             {/* Only render <img> if we have a URL and haven't encountered an error */}
@@ -195,6 +285,7 @@ function App() {
               />
             )}
             <div className="p-6 md:p-8 space-y-6">
+              {/* Title */}
               {recipe.title && (
                 <h2 className="text-2xl font-bold text-gray-900">{recipe.title}</h2>
               )}
@@ -208,6 +299,10 @@ function App() {
                 </div>
               )}
 
+              {/* Equipment & Times */}
+              {renderEquipmentAndTimes()}
+
+              {/* Ingredients */}
               {recipe.ingredients && recipe.ingredients.length > 0 && (
                 <div>
                   <div className="flex items-center gap-2 mb-4">
@@ -234,6 +329,7 @@ function App() {
                 </div>
               )}
 
+              {/* Instructions */}
               {recipe.instructions && recipe.instructions.length > 0 && (
                 <div>
                   <div className="flex items-center gap-2 mb-4">
@@ -250,6 +346,7 @@ function App() {
                 </div>
               )}
 
+              {/* Notes */}
               {recipe.notes && (
                 <div>
                   <h3 className="text-xl font-semibold text-gray-900 mb-2">Notes</h3>
@@ -257,6 +354,7 @@ function App() {
                 </div>
               )}
 
+              {/* Total Cost */}
               {recipe.total_cost_estimate && (
                 <div>
                   <h3 className="text-xl font-semibold text-gray-900 mb-2">
@@ -266,7 +364,11 @@ function App() {
                 </div>
               )}
 
-              {recipe.total_macros && renderMacros()}
+              {/* Macros */}
+              {renderMacros()}
+
+              {/* Dietary Substitutions */}
+              {renderDietarySubstitutions()}
             </div>
           </div>
         )}

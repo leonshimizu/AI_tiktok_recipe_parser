@@ -22,7 +22,7 @@ def download_tiktok_video(url):
     command = [
         "yt-dlp",
         "--verbose",
-        "-f", "bv*+ba/b",            # Pick bestvideo+bestaudio if available, else fallback
+        "-f", "bv*+ba/b",  # Pick bestvideo+bestaudio if available, else fallback
         "--merge-output-format", "mp4",  # Merge into a single MP4
         url,
         "-o", video_filename
@@ -31,6 +31,9 @@ def download_tiktok_video(url):
     return video_filename
 
 def get_tiktok_data(url):
+    """
+    Uses yt-dlp --dump-json to retrieve metadata, including description and thumbnail.
+    """
     command = ["yt-dlp", url, "--dump-json"]
     try:
         result = subprocess.run(command, capture_output=True, text=True, check=True)
@@ -77,33 +80,42 @@ def moderate_text(text):
 
 def parse_with_gpt(transcript, description, location):
     """
-    Ask GPT to produce a structured JSON recipe with cost, macros,
-    and an inferred number of servings, using 'location' as a hint for local prices.
+    Updated prompt to produce a structured JSON recipe with cost, macros,
+    an inferred number of servings, cooking/prep times, equipment, and
+    dietary substitutions.
     """
     prompt = f"""
 You are a highly knowledgeable cooking assistant. I will provide a cooking video transcript, 
 a video description, and a location (which can be anywhere in the world).
 
 Your tasks:
-1. Determine a concise, descriptive, and accurate title for the recipe. 
-2. For each ingredient, always provide a measurement. If no measurement is found, infer a reasonable amount and append "(approx.)".
-3. Estimate the local cost of each ingredient in the given location: "{location}". 
-   Provide approximate cost as a local currency price, e.g., "X.XX (local currency)". 
-   If unsure of currency, choose one that might be appropriate for that location 
-   (e.g., if location is "Tokyo, Japan", use JPY).
+1. Determine a concise, accurate title for the recipe.
+2. For each ingredient, always provide a measurement. If no measurement is found, 
+   infer a reasonable amount and append "(approx.)".
+3. Estimate local cost of each ingredient in the given location "{location}" as "X.XX (local currency)".
 4. For each ingredient, also estimate macros (protein, carbs, fat, calories) as accurately as possible.
-5. Provide a clear list of instructions in logical order.
-6. Include a notes field stating that measurements, costs, and macros are approximations.
-7. Add "total_cost_estimate" summing all ingredients into a range like "X - Y (local currency)".
-8. Add "total_macros" summarizing total protein, carbs, fat, and calories for the entire dish.
-9. Add a "servings" field indicating how many servings this recipe makes. 
-   - If servings > 1, we will show macros per serving on the frontend, 
-     but you still provide total macros for the entire dish.
+5. Provide a list of instructions in logical order.
+6. Include total cooking time ("cook_time_minutes") and total prep time ("prep_time_minutes").
+7. Provide a list of required kitchen equipment under "equipment".
+8. Include a 'notes' field stating that measurements, costs, and macros are approximations.
+9. Add "total_cost_estimate" summing all ingredients into a range like "X - Y (local currency)".
+10. Add "total_macros" summarizing total protein, carbs, fat, and calories for the entire dish.
+11. Add a "servings" field indicating how many servings this recipe makes.
+12. Provide a "dietary_substitutions" field for common dietary restrictions (e.g., gluten_free, vegan, dairy_free),
+   suggesting alternative ingredients if relevant.
 
-Output in strict JSON format. Use a structure like this:
+Output in strict JSON format. Example structure:
+
 {{
   "title": "Some Descriptive Title",
-  "servings": X,
+  "servings": 4,
+  "prep_time_minutes": 10,
+  "cook_time_minutes": 20,
+  "equipment": [
+    "Mixing bowl",
+    "Pan",
+    "Spatula"
+  ],
   "ingredients": [
     {{
       "name": "Ingredient Name",
@@ -124,6 +136,11 @@ Output in strict JSON format. Use a structure like this:
     "carbs_g": X,
     "fat_g": X,
     "calories": X
+  }},
+  "dietary_substitutions": {{
+    "gluten_free": "...",
+    "vegan": "...",
+    "dairy_free": "..."
   }}
 }}
 
@@ -132,6 +149,7 @@ Transcript:
 
 Description:
 \"\"\"{description}\"\"\"
+
 Location: \"{location}\"
 """
     response = client.chat.completions.create(
@@ -180,7 +198,7 @@ if __name__ == "__main__":
         # 6. Parse with GPT
         recipe = parse_with_gpt(transcript, description, location)
 
-        # If we got a thumbnail URL, include it in the result
+        # If we got a thumbnail URL, include it
         if thumbnail_url:
             recipe["image_url"] = thumbnail_url
 
@@ -189,7 +207,7 @@ if __name__ == "__main__":
         sys.stdout.flush()
 
     except subprocess.CalledProcessError as e:
-        # If either yt-dlp or ffmpeg fails
+        # If yt-dlp or ffmpeg fails
         error_result = {
             "title": "",
             "ingredients": [],
