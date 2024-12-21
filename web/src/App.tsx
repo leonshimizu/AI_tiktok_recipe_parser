@@ -31,11 +31,14 @@ interface Recipe {
 
 function App() {
   const [url, setUrl] = useState('');
-  const [location, setLocation] = useState(''); // renamed from zipcode to location
+  const [location, setLocation] = useState('');
   const [loading, setLoading] = useState(false);
   const [recipe, setRecipe] = useState<Recipe | null>(null);
   const [error, setError] = useState('');
-  const [showMacros, setShowMacros] = useState(false); 
+  const [showMacros, setShowMacros] = useState(false);
+
+  // NEW: Track if the image failed to load
+  const [imageError, setImageError] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -46,10 +49,8 @@ function App() {
     try {
       const response = await fetch('/extract', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ url, zipcode: location }), // still send as 'zipcode' for backend compatibility
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url, zipcode: location }),
       });
 
       if (!response.ok) {
@@ -58,6 +59,8 @@ function App() {
 
       const data: Recipe = await response.json();
       setRecipe(data);
+      // Reset image error in case user re-submits
+      setImageError(false);
     } catch (err) {
       setError('Failed to extract recipe. Please check the URL and try again.');
     } finally {
@@ -182,11 +185,13 @@ function App() {
 
         {recipe && (
           <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
-            {recipe.image_url && (
+            {/* Only render <img> if we have a URL and haven't encountered an error */}
+            {recipe.image_url && !imageError && (
               <img
                 src={recipe.image_url}
                 alt="Recipe"
                 className="w-full h-64 object-cover"
+                onError={() => setImageError(true)}
               />
             )}
             <div className="p-6 md:p-8 space-y-6">
@@ -197,7 +202,9 @@ function App() {
               {/* Servings */}
               {recipe.servings && recipe.servings > 0 && (
                 <div className="text-gray-700">
-                  <p><strong>Servings:</strong> {recipe.servings}</p>
+                  <p>
+                    <strong>Servings:</strong> {recipe.servings}
+                  </p>
                 </div>
               )}
 
@@ -206,7 +213,7 @@ function App() {
                   <div className="flex items-center gap-2 mb-4">
                     <UtensilsCrossed className="w-6 h-6 text-purple-600" />
                     <h3 className="text-xl font-semibold text-gray-900">
-                      Ingredients & Costs
+                      Ingredients &amp; Costs
                     </h3>
                   </div>
                   <ul className="space-y-4">
@@ -217,7 +224,9 @@ function App() {
                           <span className="font-semibold">
                             {ingredient.name} ({ingredient.amount})
                           </span>
-                          <span className="text-sm text-gray-500">{ingredient.cost}</span>
+                          <span className="text-sm text-gray-500">
+                            {ingredient.cost}
+                          </span>
                         </div>
                       </li>
                     ))}
@@ -250,7 +259,9 @@ function App() {
 
               {recipe.total_cost_estimate && (
                 <div>
-                  <h3 className="text-xl font-semibold text-gray-900 mb-2">Total Cost Estimate</h3>
+                  <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                    Total Cost Estimate
+                  </h3>
                   <p className="text-gray-700">{recipe.total_cost_estimate}</p>
                 </div>
               )}
