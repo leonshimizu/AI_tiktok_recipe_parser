@@ -222,7 +222,7 @@ function App() {
             <ChefHat className="w-12 h-12 text-purple-600" />
           </div>
           <h1 className="text-4xl font-bold text-gray-900 mb-4">
-            TikTok Recipe Extractor
+            Recipe Extractor
           </h1>
           <p className="text-lg text-gray-600">
             Transform your favorite short cooking videos into detailed recipes with cost, macros,
