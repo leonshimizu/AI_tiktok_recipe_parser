@@ -83,7 +83,11 @@ A Python-based web application that extracts recipes from short cooking videos o
 5. Configure your OpenAI API key:
    Retrieve an API key from the OpenAI platform. Then:
    ```bash
-   export OPENAI_API_KEY="sk-..."
+   cp .env.example .env
+   ```
+   Edit the `.env` file and replace `your_openai_api_key_here` with your actual OpenAI API key:
+   ```
+   OPENAI_API_KEY=sk-your-actual-api-key-here
    ```
 
 6. Run the backend application:

@@ -1,9 +1,12 @@
 openai==1.57.4
-openai-whisper==20240930
-yt-dlp==2023.10.07
+openai-whisper
+yt-dlp==2025.1.12
 Flask==2.3.2
 Flask-Cors==3.0.10
-torch==2.2.2
-Pillow==10.0.1
-numpy==1.26.4
+torch
+Pillow
+numpy
 gunicorn
+python-dotenv==1.0.0
+aiohttp==3.9.1
+asyncio

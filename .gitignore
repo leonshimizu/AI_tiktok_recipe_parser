@@ -1,20 +1,65 @@
-# Ignore Python cache
+# Environment variables
+.env
+
+# Python
 __pycache__/
-*.pyc
-*.pyo
-*.pyd
-*.py[co]
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
 
-# Ignore virtual environment directories
+# Virtual environments
 venv/
-.env/
+env/
+ENV/
+env.bak/
+venv.bak/
+3.13/
+Ensure/
+Python/
+this/
+uses/
 
-# Ignore OS-specific files
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
 
-# Ignore various editor/project files
+# Temporary files
+*.tmp
+*.temp
+video_*.mp4
+audio_*.wav
+
+# IDE
 .vscode/
 .idea/
-
-# Ignore secrets, if you store them in a file
-.env
+*.swp
+*.swo
+*~

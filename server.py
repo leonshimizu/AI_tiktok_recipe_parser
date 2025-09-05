@@ -1,8 +1,16 @@
 import os
 import json
 import subprocess
-from flask import Flask, request, jsonify, send_from_directory
+from flask import Flask, request, jsonify, send_from_directory, Response
 from flask_cors import CORS
+
+# Try to load environment variables from .env file
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    import sys
+    print("Warning: python-dotenv not available. Make sure to set environment variables manually.", file=sys.stderr)
 
 def create_app(test_config=None):
     app = Flask(__name__, static_folder='web/dist', static_url_path='/')
@@ -28,11 +36,12 @@ def create_app(test_config=None):
         print(f"DEBUG: Received location: {location}")
 
         try:
-            # Run the app.py script and capture output
+            # Run the consolidated app script and capture output
             result = subprocess.run(
                 ['python3', 'app.py', url, location],
                 capture_output=True,
-                text=True
+                text=True,
+                encoding='utf-8'
             )
 
             print("DEBUG: Completed subprocess call.")
@@ -63,6 +72,67 @@ def create_app(test_config=None):
             print("ERROR: Unexpected exception encountered.")
             print("Exception details:", ex)
             return jsonify({"error": f"Unexpected error: {str(ex)}"}), 500
+
+    @app.route('/extract-stream', methods=['POST'])
+    def extract_stream():
+        """Streaming endpoint with real-time progress updates"""
+        data = request.get_json()
+        url = data.get('url')
+        location = data.get('zipcode')
+        
+        if not url:
+            return jsonify({"error": "No URL provided"}), 400
+        if not location:
+            return jsonify({"error": "No location provided"}), 400
+
+        print(f"DEBUG: Starting streaming extraction for URL: {url}")
+        print(f"DEBUG: Location: {location}")
+
+        def generate_stream():
+            """Generate Server-Sent Events"""
+            try:
+                # Run the streaming version of the app
+                import subprocess
+                process = subprocess.Popen(
+                    ['python3', 'app.py', url, location, '--stream'],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                    encoding='utf-8'
+                )
+                
+                # Read the output line by line
+                for line in iter(process.stdout.readline, ''):
+                    if line.strip():
+                        yield line
+                
+                # Wait for process to complete
+                process.wait()
+                
+                if process.returncode != 0:
+                    error_data = {
+                        "type": "error",
+                        "message": f"Processing failed with return code {process.returncode}"
+                    }
+                    yield f"data: {json.dumps(error_data)}\n\n"
+                    
+            except Exception as e:
+                error_data = {
+                    "type": "error",
+                    "message": f"Stream processing failed: {str(e)}"
+                }
+                yield f"data: {json.dumps(error_data)}\n\n"
+
+        return Response(
+            generate_stream(),
+            mimetype='text/event-stream',
+            headers={
+                'Cache-Control': 'no-cache',
+                'Connection': 'keep-alive',
+                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Headers': 'Cache-Control'
+            }
+        )
 
     @app.route('/health', methods=['GET'])
     def health_check():
